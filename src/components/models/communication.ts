@@ -1,20 +1,19 @@
-import { Api } from '../base/Api';
-import { IProductsResponse, IOrderRequest, IOrderResponse } from '../../types/index';
+import { IProductsResponse, IOrderRequest, IOrderResponse, IApi } from '../../types/index';
 
 export class Communication {
-  private api: Api;
+  private api: IApi;
 
-  constructor(api: Api) {
+  constructor(api: IApi) {
     this.api = api;
   }
 
   /** Получение списка товаров с сервера */
   async getProducts(): Promise<IProductsResponse> {
-    return await this.api.get('/product/');
+    return await this.api.get<IProductsResponse>('/product/');
   }
 
   /** Отправка данных заказа на сервер */
    async sendOrder(orderData: IOrderRequest): Promise<IOrderResponse> {
-    return await this.api.post('/order/', orderData);
+    return await this.api.post<IOrderResponse>('/order/', orderData);
   }
 }

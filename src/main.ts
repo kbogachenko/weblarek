@@ -45,9 +45,24 @@ buyer.setPayment('card');
 
 console.log('Данные покупателя:', buyer.getData());
 
+// Тестирование класса Buyer, когда все данные корректные
 const validationErrors = buyer.validate();
 if (validationErrors) {
   console.log('Ошибки валидации:', validationErrors);
+} else {
+  console.log('Валидация пройдена успешно');
+}
+
+// Тестирование класса Buyer, когда все данные НЕкорректные
+const wrongBuyer = new Buyer();
+wrongBuyer.setEmail('');
+wrongBuyer.setPhone('');
+wrongBuyer.setAddress('');
+wrongBuyer.setPayment(null);
+
+const validationErrorsWrongBuyer = wrongBuyer.validate();
+if (validationErrorsWrongBuyer) {
+  console.log('Ошибки валидации:', validationErrorsWrongBuyer);
 } else {
   console.log('Валидация пройдена успешно');
 }

@@ -23,15 +23,13 @@ export interface IBuyer {
   address: string;
 }
 
+export type TBuyerErrors = Partial<Record<keyof IBuyer, string>>; 
+
 // тип, описывающий доступные виды оплаты;
-export type TPayment = 'card' | 'cash';
+export type TPayment = 'card' | 'cash' | null;
 
 // тип для объекта, отправляемого на сервер при оформлении заказа;
-export interface IOrderRequest {
-  payment: string;
-  email: string;
-  phone: string;
-  address: string;
+export interface IOrderRequest extends IBuyer {
   total: number;
   items: string[];
 }
