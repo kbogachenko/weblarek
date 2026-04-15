@@ -41,7 +41,7 @@ export class Buyer {
     this.address = '';
   }
 
-  validate(): TBuyerErrors | null {
+  validate(): TBuyerErrors {
     const errors: TBuyerErrors = {};
 
     if (this.payment === null) {
