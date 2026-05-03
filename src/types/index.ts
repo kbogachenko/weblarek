@@ -44,3 +44,61 @@ export interface IOrderResponse {
   id: string;
   total: number;
 }
+
+export interface IHeader {
+  counter: number;
+}
+
+export interface IGallery {
+  catalog: HTMLElement[];
+}
+
+export interface IModal {
+  content: HTMLElement;
+}
+
+export interface ISuccess {
+  description: string;
+}
+
+export interface IBasket {
+  list: HTMLElement[];
+  price: number | null;
+  valid: boolean;
+}
+
+export interface ICard {
+  title: string;
+  price: number | null;
+}
+
+export interface ICardCatalog extends ICard {
+  category: string;
+  image: string;
+}
+
+export interface ICardPreview extends ICard {
+  category: string;
+  image: string;
+  text: string;
+  inCart: boolean;
+}
+
+export interface ICardBasket extends ICard {
+  index: number;
+}
+
+export interface IForm {
+  errors: string;
+  valid: boolean;
+}
+
+export interface IFormOrder extends IForm {
+  payment: TPayment;
+  address: string;
+}
+
+export interface IFormContact extends IForm {
+  email: string;
+  phone: string;
+}
