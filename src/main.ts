@@ -14,12 +14,14 @@ import { Header } from './components/views/header';
 import { Gallery } from './components/views/gallery';
 import { Modal } from './components/views/modal';
 import { Basket } from './components/views/basket';
-import { FormOrder } from './components/views/formorder';
-import { FormContacts } from './components/views/formcontacts';
+import { FormOrder } from './components/views/formOrder';
+import { FormContacts } from './components/views/formContacts';
 import { Success } from './components/views/success';
-import { CardCatalog } from './components/views/cardcatalog';
-import { CardPreview } from './components/views/cardpreview';
-import { CardBasket } from './components/views/cardbasket';
+import { CardCatalog } from './components/views/cardCatalog';
+import { CardPreview } from './components/views/cardPreview';
+import { CardBasket } from './components/views/cardBasket';
+
+import { cloneTemplate, ensureElement } from './utils/utils.ts';
 
 const api = new Api(API_URL);
 const events = new EventEmitter();
@@ -28,15 +30,18 @@ const cart = new Cart(events);
 const buyer = new Buyer(events);
 const communication = new Communication(api);
 
-const headerContainer = document.querySelector('.header') as HTMLElement;
-const galleryContainer = document.querySelector('.gallery') as HTMLElement;
-const modalContainer = document.querySelector('#modal-container') as HTMLElement;
+const headerContainer = ensureElement<HTMLElement>('.header');
+const galleryContainer = ensureElement('.gallery');
+const modalContainer = ensureElement('#modal-container');
 
 const header = new Header(headerContainer, events);
 const gallery = new Gallery(galleryContainer);
 const modal = new Modal(modalContainer, events);
 
 let currentPreviewElement: HTMLElement | null = null;
+
+let orderSubmitAttempted = false;
+let contactsSubmitAttempted = false;
 
 communication.getProducts()
     .then(data => catalog.saveProducts(data.items))
@@ -45,70 +50,65 @@ communication.getProducts()
 events.on('catalog:products:updated', () => {
     const products = catalog.getProducts();
     const cards = products.map(product => {
-        const template = document.querySelector('#card-catalog') as HTMLTemplateElement;
-        const cardElement = template.content.firstElementChild!.cloneNode(true) as HTMLElement;
-        const card = new CardCatalog(cardElement, events);
+        const cardElement = cloneTemplate('#card-catalog');
+        cardElement.id = product.id;
+        
+        const card = new CardCatalog(cardElement, {
+            onClick: () => events.emit('card:selected', { id: cardElement.id })
+        });
         card.title = product.title;
         card.price = product.price;
         card.category = product.category;
         card.image = product.image;
-        cardElement.dataset.id = product.id;
         return card.render();
     });
     gallery.catalog = cards;
 });
 
-events.on('cart:changed', () => {
-    header.counter = cart.getItemCount();
-});
+let currentPreview: CardPreview | null = null;  
 
 events.on('card:selected', (data: { id: string }) => {
     const product = catalog.getProductById(data.id);
     if (product) {
-        const template = document.querySelector('#card-preview') as HTMLTemplateElement;
-        const previewElement = template.content.firstElementChild!.cloneNode(true) as HTMLElement;
-        const preview = new CardPreview(previewElement, events);
-        preview.title = product.title;
-        preview.price = product.price;
-        preview.category = product.category;
-        preview.image = product.image;
-        preview.text = product.description;
-        preview.inCart = cart.hasItem(product.id);
-        previewElement.dataset.id = product.id;
-        currentPreviewElement = previewElement;
-        modal.content = preview.render();
+        catalog.setSelectedProduct(product);
+        const previewElement = cloneTemplate('#card-preview');
+        previewElement.id = product.id;
+        
+        currentPreview = new CardPreview(previewElement, {
+            onClick: () => {
+                const currentProduct = catalog.getSelectedProduct();
+                if (currentProduct && currentProduct.price !== null) {
+                    if (cart.hasItem(currentProduct.id)) {
+                        cart.removeItem(currentProduct);
+                    } else {
+                        cart.addItem(currentProduct);
+                    }
+                }
+            }
+        });
+        
+        currentPreview.title = product.title;
+        currentPreview.price = product.price;
+        currentPreview.category = product.category;
+        currentPreview.image = product.image;
+        currentPreview.text = product.description;
+        currentPreview.inCart = cart.hasItem(product.id);
+        
+        modal.content = currentPreview.render();
         modal.open();
     }
 });
 
-events.on('card:add', (data: { id: string }) => {
-    const product = catalog.getProductById(data.id);
-    if (product) {
-        cart.addItem(product);
-    if (currentPreviewElement && currentPreviewElement.dataset.id === data.id) {
-        const button = currentPreviewElement.querySelector('.card__button') as HTMLButtonElement;
-        if (button) {
-            button.textContent = 'Удалить из корзины';
-            button.dataset.action = 'remove';
-        }
-    }
-    }
-});
-
-events.on('card:remove', (data: { id: string }) => {
-    const product = catalog.getProductById(data.id);
-    if (product) {
-        cart.removeItem(product);
-        if (currentPreviewElement && currentPreviewElement.dataset.id === data.id) {
-            const button = currentPreviewElement.querySelector('.card__button') as HTMLButtonElement;
-            if (button) {
-                button.textContent = 'Купить';
-                button.dataset.action = 'add';
-            }
+events.on('cart:changed', () => {
+    header.counter = cart.getItemCount();
+    
+    if (currentPreview) {
+        const product = catalog.getSelectedProduct();
+        if (product) {
+            currentPreview.inCart = cart.hasItem(product.id);
         }
     }
 });
-
 
 events.on('cardBasket:remove', (data: { id: string }) => {
     const product = catalog.getProductById(data.id);
@@ -120,18 +120,19 @@ events.on('cardBasket:remove', (data: { id: string }) => {
 
 events.on('basket:open', () => {
     const items = cart.getItems();
-    const template = document.querySelector('#basket') as HTMLTemplateElement;
-    const basketElement = template.content.firstElementChild!.cloneNode(true) as HTMLElement;
+    const basketElement = cloneTemplate('#basket');
     const basket = new Basket(basketElement, events);
     
     const basketCards = items.map((item, index) => {
-        const cardTemplate = document.querySelector('#card-basket') as HTMLTemplateElement;
-        const cardElement = cardTemplate.content.firstElementChild!.cloneNode(true) as HTMLElement;
-        const card = new CardBasket(cardElement, events);
+        const cardElement = cloneTemplate('#card-basket');
+        cardElement.id = item.id;
+        
+        const card = new CardBasket(cardElement, {
+            onClick: () => events.emit('cardBasket:remove', { id: cardElement.id })
+        });
         card.title = item.title;
         card.price = item.price;
         card.index = index + 1;
-        cardElement.dataset.id = item.id;
         return card.render();
     });
     
@@ -143,39 +144,79 @@ events.on('basket:open', () => {
     modal.open();
 });
 
+const formOrderElement = cloneTemplate('#order');
+const formOrder = new FormOrder(formOrderElement, events);
+
+
 events.on('basket:submit', () => {
-    const template = document.querySelector('#order') as HTMLTemplateElement;
-    const formElement = template.content.firstElementChild!.cloneNode(true) as HTMLElement;
-    const form = new FormOrder(formElement, events);
-    modal.content = form.render();
+    orderSubmitAttempted = false;
+    const buyerData = buyer.getData();
+
+    formOrder.address = buyerData.address;
+    formOrder.payment = buyerData.payment;
+    formOrder.errors = '';
+    formOrder.valid = true;
+    
+    modal.content = formOrder.render();
     modal.open();
 });
 
-events.on('order:card', () => buyer.setPayment('card'));
-events.on('order:cash', () => buyer.setPayment('cash'));
-events.on('order:address', (data: { address: string }) => buyer.setAddress(data.address));
-
-events.on('order:submit', () => {
-    const { payment, address } = buyer.getData();
-    if (payment && address) {
-        const template = document.querySelector('#contacts') as HTMLTemplateElement;
-        const formElement = template.content.firstElementChild!.cloneNode(true) as HTMLElement;
-        const form = new FormContacts(formElement, events);
-        modal.content = form.render();
-        modal.open();
-    }
+events.on('order:card', () => {
+    buyer.setPayment('card');
+    formOrder.payment = 'card';
 });
 
-events.on('contact:email', (data: { email: string }) => buyer.setEmail(data.email));
-events.on('contact:phone', (data: { phone: string }) => buyer.setPhone(data.phone));
+events.on('order:cash', () => {
+    buyer.setPayment('cash');
+    formOrder.payment = 'cash';
+});
+
+events.on('order:address', (data: { address: string }) => {
+    buyer.setAddress(data.address);
+    formOrder.address = data.address;
+});
+
+events.on('buyer:changed', () => {
+    validateOrderForm();
+    validateContactForm();
+    formOrder.payment = buyer.getData().payment;
+});
+
+const formContactElement = cloneTemplate('#contacts');
+const formContact = new FormContacts(formContactElement, events);
+
+events.on('order:submit', () => {
+    const buyerData = buyer.getData();
+    const errors = buyer.validate();
+    const hasErrors = errors.email || errors.phone;
+
+    let errorText = '';
+    if (errors.email) errorText += errors.email + '. ';
+    if (errors.phone) errorText += errors.phone + '. ';
+
+    modal.content = formContact.render({
+        ...buyerData,
+        valid: !hasErrors,
+        errors: errorText
+    });
+});
+
+events.on('contact:email', (data: { email: string }) => {
+    buyer.setEmail(data.email);
+    formContact.email = data.email;
+});
+
+events.on('contact:phone', (data: { phone: string }) => {
+    buyer.setPhone(data.phone);
+    formContact.phone = data.phone;
+});
 
 events.on('contact:submit', () => {
     const orderData = buyer.getData();
     const items = cart.getItems();
     const total = cart.getTotalPrice();
     
-    if (orderData.email && orderData.phone) {
-        communication.sendOrder({
+    communication.sendOrder({
             ...orderData,
             items: items.map(item => item.id),
             total
@@ -183,17 +224,41 @@ events.on('contact:submit', () => {
             .then(() => {
                 cart.clear();
                 buyer.clear();
-                modal.close();
-                
-                const template = document.querySelector('#success') as HTMLTemplateElement;
-                const successElement = template.content.firstElementChild!.cloneNode(true) as HTMLElement;
+                const successElement = cloneTemplate('#success');
                 const success = new Success(successElement, events);
                 success.description = `Списано ${total} синапсов`;
                 modal.content = success.render();
-                modal.open();
             })
-            .catch(err => console.error('Ошибка оформления заказа:', err));
-    }
+            .catch(err => {
+                console.error('Ошибка оформления заказа:', err);
+                formContact.errors = 'Не удалось оформить заказ. Попробуйте снова.';
+                formContact.valid = false;
+            });
 });
 
 events.on('success:close', () => modal.close());
+
+function validateOrderForm() {
+    const errors = buyer.validate();
+    const hasErrors = errors.payment || errors.address;
+
+    let errorText = '';
+    if (errors.payment) errorText += errors.payment + '. ';
+    if (errors.address) errorText += errors.address + '. ';
+
+    formOrder.errors = errorText;
+    formOrder.valid = !hasErrors;
+}
+
+function validateContactForm() {
+    const errors = buyer.validate();
+    const hasErrors = errors.email || errors.phone;
+
+    let errorText = '';
+    if (errors.email) errorText += errors.email + '. ';
+    if (errors.phone) errorText += errors.phone + '. ';
+
+    formContact.errors = errorText;
+    formContact.valid = !hasErrors;
+}
+

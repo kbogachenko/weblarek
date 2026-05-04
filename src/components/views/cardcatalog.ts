@@ -1,28 +1,26 @@
 import { Card } from './card';
-import { ICardCatalog } from '../../types';
+import { ICardCatalog, ICardActions } from '../../types';
 import { ensureElement } from '../../utils/utils';
-import { IEvents } from '../base/Events';
 import { categoryMap } from '../../utils/constants';
 import { CDN_URL } from "../../utils/constants";
 
 export class CardCatalog extends Card<ICardCatalog> {
     private categoryElement: HTMLElement;
     private imageElement: HTMLImageElement;
-    private events: IEvents;
+    private actions?: ICardActions;
 
-    constructor(container: HTMLElement, events: IEvents) {
+    constructor(container: HTMLElement, actions?: ICardActions) {
         super(container);
-        this.events = events;
+        this.actions = actions;
 
         this.categoryElement = ensureElement<HTMLElement>('.card__category', this.container);
         this.imageElement = ensureElement<HTMLImageElement>('.card__image', this.container);
 
         this.container.addEventListener('click', () => {
-        const id = this.container.dataset.id;
-        if (id) {
-        this.events.emit('card:selected', { id });
-    }
-});
+            if (this.actions?.onClick) {
+                this.actions.onClick();
+            }
+        });
     }
 
     set category(value: string) {

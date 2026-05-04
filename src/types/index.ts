@@ -102,3 +102,7 @@ export interface IFormContact extends IForm {
   email: string;
   phone: string;
 }
+
+export interface ICardActions {
+    onClick?: () => void;
+}

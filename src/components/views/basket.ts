@@ -30,13 +30,9 @@ export class Basket extends Component<IBasket> {
         }
     }
 
-    set price(price: number | null) {
-        if (price === null) {
-            this.priceElement.textContent = 'Бесценно';
-        } else {
-            this.priceElement.textContent = `${price} синапсов`;
+    set price(price: number) {
+        this.priceElement.textContent = `${price} синапсов`;
         }
-    }
 
     set valid(value: boolean) {
         this.orderButton.disabled = !value;

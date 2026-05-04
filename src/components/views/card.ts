@@ -18,10 +18,6 @@ export abstract class Card<T extends ICard> extends Component<T> {
   }
 
   set price(price: number | null) {
-    if (price === null) {
-      this.priceElement.textContent = 'Бесценно';
-    } else {
-      this.priceElement.textContent = `${price} синапсов`
-    }
+    this.priceElement.textContent = price === null ? 'Бесценно' : `${price} синапсов`
   }
 }

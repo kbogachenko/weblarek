@@ -1,26 +1,21 @@
 import { Card } from './card';
 import { ensureElement } from '../../utils/utils';
 import { IEvents } from '../base/Events';
-import { ICardBasket } from '../../types';
+import { ICardBasket, ICardActions } from '../../types';
 
 export class CardBasket extends Card<ICardBasket> {
     private indexElement: HTMLElement;
     private deleteButton: HTMLButtonElement;
-    private events: IEvents;
 
-    constructor(container: HTMLElement, events: IEvents) {
+    constructor(container: HTMLElement, actions?: ICardActions) {
         super(container);
-        this.events = events;
 
         this.indexElement = ensureElement<HTMLElement>('.basket__item-index', this.container);
         this.deleteButton = ensureElement<HTMLButtonElement>('.basket__item-delete', this.container);
 
-        this.deleteButton.addEventListener('click', () => {
-            const id = this.container.dataset.id;
-            if (id) {
-                this.events.emit('cardBasket:remove', { id });
-            }
-        });
+        if (actions?.onClick) {
+            this.deleteButton.addEventListener('click', actions.onClick);
+        }
     }
 
     set index(index: number) {
