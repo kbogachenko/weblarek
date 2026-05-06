@@ -38,10 +38,8 @@ const header = new Header(headerContainer, events);
 const gallery = new Gallery(galleryContainer);
 const modal = new Modal(modalContainer, events);
 
-let currentPreviewElement: HTMLElement | null = null;
-
-let orderSubmitAttempted = false;
-let contactsSubmitAttempted = false;
+const basketElement = cloneTemplate('#basket');
+const basket = new Basket(basketElement, events);
 
 communication.getProducts()
     .then(data => catalog.saveProducts(data.items))
@@ -75,15 +73,8 @@ events.on('card:selected', (data: { id: string }) => {
         previewElement.id = product.id;
         
         currentPreview = new CardPreview(previewElement, {
-            onClick: () => {
-                const currentProduct = catalog.getSelectedProduct();
-                if (currentProduct && currentProduct.price !== null) {
-                    if (cart.hasItem(currentProduct.id)) {
-                        cart.removeItem(currentProduct);
-                    } else {
-                        cart.addItem(currentProduct);
-                    }
-                }
+            onClick: () => { 
+                events.emit('preview:toggle');
             }
         });
         
@@ -99,6 +90,17 @@ events.on('card:selected', (data: { id: string }) => {
     }
 });
 
+events.on('preview:toggle', () => {
+    const currentProduct = catalog.getSelectedProduct();
+    if (currentProduct && currentProduct.price !== null) {
+        if (cart.hasItem(currentProduct.id)) {
+            cart.removeItem(currentProduct);
+        } else {
+            cart.addItem(currentProduct);
+        }
+    }
+});
+
 events.on('cart:changed', () => {
     header.counter = cart.getItemCount();
     
@@ -108,6 +110,24 @@ events.on('cart:changed', () => {
             currentPreview.inCart = cart.hasItem(product.id);
         }
     }
+    
+    const items = cart.getItems();
+    const basketCards = items.map((item, index) => {
+    const cardElement = cloneTemplate('#card-basket');
+    cardElement.id = item.id;
+        
+    const card = new CardBasket(cardElement, {
+        onClick: () => events.emit('cardBasket:remove', { id: cardElement.id })
+    });
+    card.title = item.title;
+    card.price = item.price;
+    card.index = index + 1;
+    return card.render();
+    });
+    
+    basket.list = basketCards;
+    basket.price = cart.getTotalPrice();
+    basket.valid = items.length > 0;
 });
 
 events.on('cardBasket:remove', (data: { id: string }) => {
@@ -119,27 +139,6 @@ events.on('cardBasket:remove', (data: { id: string }) => {
 });
 
 events.on('basket:open', () => {
-    const items = cart.getItems();
-    const basketElement = cloneTemplate('#basket');
-    const basket = new Basket(basketElement, events);
-    
-    const basketCards = items.map((item, index) => {
-        const cardElement = cloneTemplate('#card-basket');
-        cardElement.id = item.id;
-        
-        const card = new CardBasket(cardElement, {
-            onClick: () => events.emit('cardBasket:remove', { id: cardElement.id })
-        });
-        card.title = item.title;
-        card.price = item.price;
-        card.index = index + 1;
-        return card.render();
-    });
-    
-    basket.list = basketCards;
-    basket.price = cart.getTotalPrice();
-    basket.valid = items.length > 0;
-    
     modal.content = basket.render();
     modal.open();
 });
@@ -149,7 +148,6 @@ const formOrder = new FormOrder(formOrderElement, events);
 
 
 events.on('basket:submit', () => {
-    orderSubmitAttempted = false;
     const buyerData = buyer.getData();
 
     formOrder.address = buyerData.address;
@@ -163,12 +161,10 @@ events.on('basket:submit', () => {
 
 events.on('order:card', () => {
     buyer.setPayment('card');
-    formOrder.payment = 'card';
 });
 
 events.on('order:cash', () => {
     buyer.setPayment('cash');
-    formOrder.payment = 'cash';
 });
 
 events.on('order:address', (data: { address: string }) => {
@@ -177,28 +173,20 @@ events.on('order:address', (data: { address: string }) => {
 });
 
 events.on('buyer:changed', () => {
+    const buyerData = buyer.getData();
+    formOrder.address = buyerData.address; 
+    formOrder.payment = buyerData.payment;
+    formContact.phone = buyerData.phone;
+    formContact.email = buyerData.email;
     validateOrderForm();
     validateContactForm();
-    formOrder.payment = buyer.getData().payment;
 });
 
 const formContactElement = cloneTemplate('#contacts');
 const formContact = new FormContacts(formContactElement, events);
 
 events.on('order:submit', () => {
-    const buyerData = buyer.getData();
-    const errors = buyer.validate();
-    const hasErrors = errors.email || errors.phone;
-
-    let errorText = '';
-    if (errors.email) errorText += errors.email + '. ';
-    if (errors.phone) errorText += errors.phone + '. ';
-
-    modal.content = formContact.render({
-        ...buyerData,
-        valid: !hasErrors,
-        errors: errorText
-    });
+    modal.content = formContact.render();
 });
 
 events.on('contact:email', (data: { email: string }) => {
@@ -210,6 +198,9 @@ events.on('contact:phone', (data: { phone: string }) => {
     buyer.setPhone(data.phone);
     formContact.phone = data.phone;
 });
+
+const successElement = cloneTemplate('#success');
+const success = new Success(successElement, events);
 
 events.on('contact:submit', () => {
     const orderData = buyer.getData();
@@ -224,8 +215,6 @@ events.on('contact:submit', () => {
             .then(() => {
                 cart.clear();
                 buyer.clear();
-                const successElement = cloneTemplate('#success');
-                const success = new Success(successElement, events);
                 success.description = `Списано ${total} синапсов`;
                 modal.content = success.render();
             })
