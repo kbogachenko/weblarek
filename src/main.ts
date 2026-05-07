@@ -148,13 +148,6 @@ const formOrder = new FormOrder(formOrderElement, events);
 
 
 events.on('basket:submit', () => {
-    const buyerData = buyer.getData();
-
-    formOrder.address = buyerData.address;
-    formOrder.payment = buyerData.payment;
-    formOrder.errors = '';
-    formOrder.valid = true;
-    
     modal.content = formOrder.render();
     modal.open();
 });
